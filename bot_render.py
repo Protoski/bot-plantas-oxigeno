@@ -778,6 +778,116 @@ def home():
         }
     }), 200
 
+@flask_app.route("/dashboard", methods=["GET"])
+def dashboard():
+    api_key = request.args.get("api_key")
+    if api_key != API_KEY:
+        return "No autorizado", 401
+
+    plantas = obtener_plantas_db()
+
+    html = """
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <title>Dashboard Plantas de Oxígeno</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background: #f4f6f9;
+                padding: 20px;
+            }
+            h1 {
+                text-align: center;
+                color: #333;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                background: white;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            }
+            th {
+                background: #005b96;
+                color: white;
+                padding: 10px;
+                font-size: 14px;
+            }
+            td {
+                padding: 10px;
+                text-align: center;
+                border-bottom: 1px solid #ddd;
+                font-size: 14px;
+            }
+            tr:nth-child(even) {
+                background: #f2f2f2;
+            }
+            .ok {
+                color: #2ecc71;
+                font-weight: bold;
+            }
+            .mantenimiento {
+                color: #f1c40f;
+                font-weight: bold;
+            }
+            .alarma {
+                color: #e74c3c;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Dashboard Plantas de Oxígeno</h1>
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Pureza (%)</th>
+                <th>Flujo (Nm³/h)</th>
+                <th>Presión (bar)</th>
+                <th>Temperatura (°C)</th>
+                <th>Modo</th>
+                <th>Alarma</th>
+                <th>Última actualización</th>
+            </tr>
+    """
+
+    for pid, p in plantas.items():
+        modo = p.get("modo", "")
+        alarma = p.get("alarma", 0)
+
+        if alarma:
+            clase = "alarma"
+            alarma_texto = "🚨 Sí"
+        elif modo == "Mantenimiento":
+            clase = "mantenimiento"
+            alarma_texto = "—"
+        else:
+            clase = "ok"
+            alarma_texto = "No"
+
+        html += f"""
+        <tr>
+            <td>{pid}</td>
+            <td>{p.get('nombre','')}</td>
+            <td>{p.get('pureza_pct',0):.1f}</td>
+            <td>{p.get('flujo_nm3h',0):.1f}</td>
+            <td>{p.get('presion_bar',0):.1f}</td>
+            <td>{p.get('temperatura_c',0):.1f}</td>
+            <td class="{clase}">{modo}</td>
+            <td class="{clase}">{alarma_texto}</td>
+            <td>{p.get('ultima_actualizacion','')}</td>
+        </tr>
+        """
+
+    html += """
+        </table>
+    </body>
+    </html>
+    """
+
+    return html
 
 # ================================================================================
 # MAIN
