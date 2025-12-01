@@ -1,0 +1,18 @@
+# render.yaml - Configuración para Render.com
+# Este archivo configura automáticamente el servicio
+
+services:
+  - type: web
+    name: bot-plantas-oxigeno
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot_render.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        sync: false  # Configurar manualmente en Render
+      - key: ADMIN_PRINCIPAL_ID
+        sync: false  # Configurar manualmente en Render
+      - key: API_KEY
+        sync: false  # Configurar manualmente en Render
+      - key: PYTHON_VERSION
+        value: 3.11.0
