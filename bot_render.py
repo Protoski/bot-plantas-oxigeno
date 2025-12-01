@@ -1033,7 +1033,7 @@ def dashboard():
     <body>
         <header>
             <h1>SCADA - Monitor de Plantas de Oxígeno</h1>
-            <div style="font-size:13px;color:#9ca3af;">ONYX Ingeniería</div>
+            <div style="font-size:13px;color:#9ca3af;">MSPyBS-DGGIES</div>
         </header>
         <div class="container">
             <div class="sidebar">
@@ -1107,7 +1107,7 @@ def dashboard():
             </div>
         </div>
         <div class="footer">
-            SCADA simplificado para monitoreo remoto de plantas PSA de oxígeno - ONYX Ingeniería
+            SCADA simplificado para monitoreo remoto de plantas PSA de oxígeno - MSPyBS - DGGIES
         </div>
 
         <script>
