@@ -842,103 +842,524 @@ def dashboard():
 
     plantas = obtener_plantas_db()
 
+    # Si no hay plantas registradas todavía
+    if not plantas:
+        return """
+        <html><body>
+        <h2>No hay plantas registradas aún.</h2>
+        <p>Esperá a que el ESP32 envíe datos o agrega una planta desde Telegram.</p>
+        </body></html>
+        """
+
+    import json
+
+    # Convertir dict de plantas a JSON para usar en JavaScript
+    plantas_json = json.dumps(plantas)
+
     html = """
     <!DOCTYPE html>
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <title>Dashboard Plantas de Oxígeno</title>
+        <title>SCADA Plantas de Oxígeno</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <style>
             body {
                 font-family: Arial, sans-serif;
-                background: #f4f6f9;
-                padding: 20px;
+                background: #0b1724;
+                color: #ecf0f1;
+                margin: 0;
+                padding: 0;
             }
-            h1 {
-                text-align: center;
-                color: #333;
+            header {
+                background: #111827;
+                padding: 15px 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.5);
             }
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                background: white;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            header h1 {
+                margin: 0;
+                font-size: 20px;
             }
-            th {
-                background: #005b96;
+            .container {
+                display: grid;
+                grid-template-columns: 260px 1fr;
+                gap: 10px;
+                padding: 10px;
+            }
+            .sidebar {
+                background: #111827;
+                border-radius: 8px;
+                padding: 10px;
+            }
+            .sidebar h2 {
+                font-size: 16px;
+                margin-top: 0;
+            }
+            .plant-list {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            .plant-item {
+                padding: 8px;
+                margin-bottom: 5px;
+                border-radius: 6px;
+                cursor: pointer;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 13px;
+            }
+            .plant-item span.nombre {
+                flex: 1;
+            }
+            .plant-item:hover {
+                background: #1f2937;
+            }
+            .plant-item.selected {
+                background: #2563eb;
+            }
+            .estado-dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                margin-left: 8px;
+            }
+            .dot-ok { background: #22c55e; }
+            .dot-mantenimiento { background: #eab308; }
+            .dot-alarma { background: #ef4444; }
+
+            .content {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .cards-row {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 10px;
+            }
+            .card {
+                background: #111827;
+                border-radius: 8px;
+                padding: 10px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            }
+            .card h3 {
+                margin: 0 0 5px 0;
+                font-size: 13px;
+                color: #9ca3af;
+            }
+            .card .valor {
+                font-size: 22px;
+                font-weight: bold;
+            }
+            .card .unidad {
+                font-size: 13px;
+                color: #9ca3af;
+                margin-left: 5px;
+            }
+            .card .subtexto {
+                font-size: 11px;
+                color: #9ca3af;
+                margin-top: 3px;
+            }
+            .card-alerta {
+                border-left: 4px solid #ef4444;
+            }
+            .filtros {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                align-items: center;
+                font-size: 13px;
+            }
+            .filtros input {
+                background: #020617;
+                border: 1px solid #374151;
+                border-radius: 4px;
+                padding: 4px 6px;
+                color: #e5e7eb;
+            }
+            .filtros button {
+                background: #2563eb;
+                border: none;
+                border-radius: 4px;
+                padding: 5px 10px;
                 color: white;
-                padding: 10px;
-                font-size: 14px;
+                cursor: pointer;
+                font-size: 13px;
             }
-            td {
+            .filtros button:hover {
+                background: #1d4ed8;
+            }
+            .charts-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            .chart-card {
+                background: #111827;
+                border-radius: 8px;
                 padding: 10px;
+            }
+            .chart-card canvas {
+                max-height: 260px;
+            }
+            .footer {
                 text-align: center;
-                border-bottom: 1px solid #ddd;
-                font-size: 14px;
+                font-size: 11px;
+                color: #6b7280;
+                padding: 8px;
             }
-            tr:nth-child(even) {
-                background: #f2f2f2;
-            }
-            .ok {
-                color: #2ecc71;
-                font-weight: bold;
-            }
-            .mantenimiento {
-                color: #f1c40f;
-                font-weight: bold;
-            }
-            .alarma {
-                color: #e74c3c;
-                font-weight: bold;
+            @media (max-width: 900px) {
+                .container {
+                    grid-template-columns: 1fr;
+                }
+                .cards-row {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+                .charts-grid {
+                    grid-template-columns: 1fr;
+                }
             }
         </style>
     </head>
     <body>
-        <h1>Dashboard Plantas de Oxígeno</h1>
-        <table>
-            <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Pureza (%)</th>
-                <th>Flujo (Nm³/h)</th>
-                <th>Presión (bar)</th>
-                <th>Temperatura (°C)</th>
-                <th>Modo</th>
-                <th>Alarma</th>
-                <th>Última actualización</th>
-            </tr>
-    """
+        <header>
+            <h1>SCADA - Monitor de Plantas de Oxígeno</h1>
+            <div style="font-size:13px;color:#9ca3af;">ONYX Ingeniería</div>
+        </header>
+        <div class="container">
+            <div class="sidebar">
+                <h2>Plantas</h2>
+                <ul class="plant-list" id="plantList"></ul>
+            </div>
+            <div class="content">
+                <div class="filtros">
+                    <div>
+                        Planta seleccionada: <strong id="plantaSeleccionadaLabel"></strong>
+                    </div>
+                    <div>
+                        Desde:
+                        <input type="datetime-local" id="filtroDesde">
+                    </div>
+                    <div>
+                        Hasta:
+                        <input type="datetime-local" id="filtroHasta">
+                    </div>
+                    <button id="btnAplicarFiltros">Aplicar filtros</button>
+                    <button id="btnUltimas24">Últimas 24h</button>
+                </div>
 
-    for pid, p in plantas.items():
-        modo = p.get("modo", "")
-        alarma = p.get("alarma", 0)
+                <div class="cards-row">
+                    <div class="card">
+                        <h3>Pureza O₂</h3>
+                        <div class="valor" id="cardPureza">--</div>
+                        <div class="subtexto" id="cardPurezaEstado"></div>
+                    </div>
+                    <div class="card">
+                        <h3>Flujo</h3>
+                        <div class="valor" id="cardFlujo">--</div>
+                        <div class="subtexto">Nm³/h</div>
+                    </div>
+                    <div class="card">
+                        <h3>Presión</h3>
+                        <div class="valor" id="cardPresion">--</div>
+                        <div class="subtexto">bar</div>
+                    </div>
+                    <div class="card">
+                        <h3>Temperatura</h3>
+                        <div class="valor" id="cardTemp">--</div>
+                        <div class="subtexto">°C</div>
+                    </div>
+                </div>
 
-        if alarma:
-            clase = "alarma"
-            alarma_texto = "🚨 Sí"
-        elif modo == "Mantenimiento":
-            clase = "mantenimiento"
-            alarma_texto = "—"
-        else:
-            clase = "ok"
-            alarma_texto = "No"
+                <div class="card card-alerta" id="cardAlarma" style="display:none;">
+                    <h3>Alarma Activa</h3>
+                    <div class="valor" id="textoAlarma">🚨</div>
+                    <div class="subtexto" id="detalleAlarma"></div>
+                </div>
 
-        html += f"""
-        <tr>
-            <td>{pid}</td>
-            <td>{p.get('nombre','')}</td>
-            <td>{p.get('pureza_pct',0):.1f}</td>
-            <td>{p.get('flujo_nm3h',0):.1f}</td>
-            <td>{p.get('presion_bar',0):.1f}</td>
-            <td>{p.get('temperatura_c',0):.1f}</td>
-            <td class="{clase}">{modo}</td>
-            <td class="{clase}">{alarma_texto}</td>
-            <td>{p.get('ultima_actualizacion','')}</td>
-        </tr>
-        """
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>Pureza O₂ (%)</h3>
+                        <canvas id="chartPureza"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Flujo (Nm³/h)</h3>
+                        <canvas id="chartFlujo"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Presión (bar)</h3>
+                        <canvas id="chartPresion"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Temperatura (°C)</h3>
+                        <canvas id="chartTemp"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="footer">
+            SCADA simplificado para monitoreo remoto de plantas PSA de oxígeno - ONYX Ingeniería
+        </div>
 
-    html += """
-        </table>
+        <script>
+            const PLANTAS = """ + plantas_json + """;
+            const API_KEY = '""" + API_KEY + """';
+
+            let plantaSeleccionada = null;
+            let chartPureza = null;
+            let chartFlujo = null;
+            let chartPresion = null;
+            let chartTemp = null;
+
+            function estadoPlanta(planta) {
+                const modo = planta.modo || '';
+                const alarma = planta.alarma;
+                if (alarma) return 'alarma';
+                if (modo === 'Mantenimiento') return 'mantenimiento';
+                return 'ok';
+            }
+
+            function crearListaPlantas() {
+                const lista = document.getElementById('plantList');
+                lista.innerHTML = '';
+
+                const ids = Object.keys(PLANTAS);
+                if (!plantaSeleccionada && ids.length > 0) {
+                    plantaSeleccionada = ids[0];
+                }
+
+                ids.forEach(id => {
+                    const p = PLANTAS[id];
+                    const li = document.createElement('li');
+                    li.className = 'plant-item' + (id === plantaSeleccionada ? ' selected' : '');
+                    li.dataset.id = id;
+
+                    const nombre = document.createElement('span');
+                    nombre.className = 'nombre';
+                    nombre.textContent = p.nombre || id;
+
+                    const dot = document.createElement('div');
+                    dot.className = 'estado-dot';
+                    const estado = estadoPlanta(p);
+                    if (estado === 'ok') dot.classList.add('dot-ok');
+                    if (estado === 'mantenimiento') dot.classList.add('dot-mantenimiento');
+                    if (estado === 'alarma') dot.classList.add('dot-alarma');
+
+                    li.appendChild(nombre);
+                    li.appendChild(dot);
+
+                    li.addEventListener('click', () => {
+                        plantaSeleccionada = id;
+                        crearListaPlantas();
+                        cargarDatos();
+                    });
+
+                    lista.appendChild(li);
+                });
+
+                const label = document.getElementById('plantaSeleccionadaLabel');
+                if (plantaSeleccionada && PLANTAS[plantaSeleccionada]) {
+                    label.textContent = PLANTAS[plantaSeleccionada].nombre || plantaSeleccionada;
+                } else {
+                    label.textContent = '(ninguna)';
+                }
+            }
+
+            function formatearFechaLocal(iso) {
+                if (!iso) return '';
+                const d = new Date(iso);
+                if (isNaN(d.getTime())) return iso;
+                return d.toLocaleString();
+            }
+
+            function actualizarTarjetas(ultimo) {
+                const cardPureza = document.getElementById('cardPureza');
+                const cardPurezaEstado = document.getElementById('cardPurezaEstado');
+                const cardFlujo = document.getElementById('cardFlujo');
+                const cardPresion = document.getElementById('cardPresion');
+                const cardTemp = document.getElementById('cardTemp');
+                const cardAlarma = document.getElementById('cardAlarma');
+                const textoAlarma = document.getElementById('textoAlarma');
+                const detalleAlarma = document.getElementById('detalleAlarma');
+
+                if (!ultimo) {
+                    cardPureza.textContent = '--';
+                    cardPurezaEstado.textContent = '';
+                    cardFlujo.textContent = '--';
+                    cardPresion.textContent = '--';
+                    cardTemp.textContent = '--';
+                    cardAlarma.style.display = 'none';
+                    return;
+                }
+
+                cardPureza.textContent = (ultimo.pureza_pct ?? 0).toFixed(1) + ' %';
+                cardFlujo.textContent = (ultimo.flujo_nm3h ?? 0).toFixed(1);
+                cardPresion.textContent = (ultimo.presion_bar ?? 0).toFixed(1);
+                cardTemp.textContent = (ultimo.temperatura_c ?? 0).toFixed(1);
+
+                const pureza = ultimo.pureza_pct ?? 0;
+                if (pureza >= 93) {
+                    cardPurezaEstado.textContent = 'Dentro de rango para uso médico (≥93%)';
+                    cardPurezaEstado.style.color = '#22c55e';
+                } else {
+                    cardPurezaEstado.textContent = 'Por debajo del rango recomendado (<93%)';
+                    cardPurezaEstado.style.color = '#ef4444';
+                }
+
+                if (ultimo.alarma) {
+                    cardAlarma.style.display = 'block';
+                    textoAlarma.textContent = '🚨 ALARMA';
+                    detalleAlarma.textContent = (ultimo.mensaje_alarma || '') + ' | ' + formatearFechaLocal(ultimo.timestamp);
+                } else {
+                    cardAlarma.style.display = 'none';
+                }
+            }
+
+            function crearOActualizarChart(chartRef, ctx, label, labels, data) {
+                if (chartRef) {
+                    chartRef.data.labels = labels;
+                    chartRef.data.datasets[0].data = data;
+                    chartRef.update();
+                    return chartRef;
+                } else {
+                    return new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: label,
+                                data: data,
+                                borderWidth: 1.5,
+                                tension: 0.2,
+                                pointRadius: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    labels: {
+                                        color: '#e5e7eb'
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        color: '#9ca3af',
+                                        maxTicksLimit: 6
+                                    }
+                                },
+                                y: {
+                                    ticks: {
+                                        color: '#9ca3af'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            function cargarDatos() {
+                if (!plantaSeleccionada) return;
+
+                const desdeInput = document.getElementById('filtroDesde').value;
+                const hastaInput = document.getElementById('filtroHasta').value;
+
+                let url = '/api/historial_json?api_key=' + encodeURIComponent(API_KEY) +
+                          '&planta_id=' + encodeURIComponent(plantaSeleccionada);
+
+                if (desdeInput) {
+                    url += '&desde=' + encodeURIComponent(desdeInput);
+                }
+                if (hastaInput) {
+                    url += '&hasta=' + encodeURIComponent(hastaInput);
+                }
+
+                fetch(url)
+                    .then(r => r.json())
+                    .then(datos => {
+                        if (!Array.isArray(datos) || datos.length === 0) {
+                            actualizarTarjetas(null);
+                            const ctxP = document.getElementById('chartPureza').getContext('2d');
+                            const ctxF = document.getElementById('chartFlujo').getContext('2d');
+                            const ctxPr = document.getElementById('chartPresion').getContext('2d');
+                            const ctxT = document.getElementById('chartTemp').getContext('2d');
+                            const labels = [];
+                            const vacio = [];
+
+                            chartPureza = crearOActualizarChart(chartPureza, ctxP, 'Pureza (%)', labels, vacio);
+                            chartFlujo = crearOActualizarChart(chartFlujo, ctxF, 'Flujo (Nm³/h)', labels, vacio);
+                            chartPresion = crearOActualizarChart(chartPresion, ctxPr, 'Presión (bar)', labels, vacio);
+                            chartTemp = crearOActualizarChart(chartTemp, ctxT, 'Temperatura (°C)', labels, vacio);
+                            return;
+                        }
+
+                        const labels = datos.map(d => {
+                            const dt = new Date(d.timestamp);
+                            return dt.toLocaleTimeString();
+                        });
+
+                        const pureza = datos.map(d => d.pureza_pct ?? 0);
+                        const flujo = datos.map(d => d.flujo_nm3h ?? 0);
+                        const presion = datos.map(d => d.presion_bar ?? 0);
+                        const temp = datos.map(d => d.temperatura_c ?? 0);
+
+                        const ultimo = datos[datos.length - 1];
+                        actualizarTarjetas(ultimo);
+
+                        const ctxP = document.getElementById('chartPureza').getContext('2d');
+                        const ctxF = document.getElementById('chartFlujo').getContext('2d');
+                        const ctxPr = document.getElementById('chartPresion').getContext('2d');
+                        const ctxT = document.getElementById('chartTemp').getContext('2d');
+
+                        chartPureza = crearOActualizarChart(chartPureza, ctxP, 'Pureza (%)', labels, pureza);
+                        chartFlujo = crearOActualizarChart(chartFlujo, ctxF, 'Flujo (Nm³/h)', labels, flujo);
+                        chartPresion = crearOActualizarChart(chartPresion, ctxPr, 'Presión (bar)', labels, presion);
+                        chartTemp = crearOActualizarChart(chartTemp, ctxT, 'Temperatura (°C)', labels, temp);
+                    })
+                    .catch(err => {
+                        console.error('Error cargando datos', err);
+                    });
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                crearListaPlantas();
+                cargarDatos();
+
+                document.getElementById('btnAplicarFiltros').addEventListener('click', () => {
+                    cargarDatos();
+                });
+
+                document.getElementById('btnUltimas24').addEventListener('click', () => {
+                    const ahora = new Date();
+                    const hace24 = new Date(ahora.getTime() - 24 * 60 * 60 * 1000);
+
+                    const formato = d => {
+                        const pad = n => n.toString().padStart(2, '0');
+                        return d.getFullYear() + '-' +
+                               pad(d.getMonth() + 1) + '-' +
+                               pad(d.getDate()) + 'T' +
+                               pad(d.getHours()) + ':' +
+                               pad(d.getMinutes());
+                    };
+
+                    document.getElementById('filtroDesde').value = formato(hace24);
+                    document.getElementById('filtroHasta').value = formato(ahora);
+                    cargarDatos();
+                });
+            });
+        </script>
     </body>
     </html>
     """
