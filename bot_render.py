@@ -756,6 +756,62 @@ def obtener_planta_api(planta_id):
     if planta_id in plantas:
         return jsonify(plantas[planta_id]), 200
     return jsonify({"error": "No encontrada"}), 404
+@flask_app.route("/api/historial_json", methods=["GET"])
+def historial_planta_json():
+    """
+    Devuelve el historial de una planta en formato JSON para usar en el dashboard.
+    Parámetros:
+      - api_key: seguridad básica por query string
+      - planta_id: ID de la planta
+      - desde (opcional): ISO 'YYYY-MM-DD' o 'YYYY-MM-DDTHH:MM'
+      - hasta (opcional): mismo formato
+    """
+    api_key = request.args.get("api_key")
+    if api_key != API_KEY:
+        return jsonify({"error": "No autorizado"}), 401
+
+    planta_id = request.args.get("planta_id")
+    if not planta_id:
+        return jsonify({"error": "Falta planta_id"}), 400
+
+    desde = request.args.get("desde")
+    hasta = request.args.get("hasta")
+
+    conn = sqlite3.connect(DATABASE_FILE)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    # Construir query con filtros opcionales por fecha
+    query = """
+        SELECT planta_id, timestamp, presion_bar, temperatura_c,
+               pureza_pct, flujo_nm3h, modo, alarma, mensaje_alarma
+        FROM historial
+        WHERE planta_id = ?
+    """
+    params = [planta_id]
+
+    if desde:
+        # Si solo viene fecha YYYY-MM-DD, completar con 00:00
+        if len(desde) == 10:
+            desde = desde + "T00:00:00"
+        query += " AND timestamp >= ?"
+        params.append(desde)
+
+    if hasta:
+        # Si solo viene fecha YYYY-MM-DD, completar con 23:59
+        if len(hasta) == 10:
+            hasta = hasta + "T23:59:59"
+        query += " AND timestamp <= ?"
+        params.append(hasta)
+
+    query += " ORDER BY timestamp ASC"
+
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+
+    datos = [dict(r) for r in rows]
+    return jsonify(datos), 200
 
 
 @flask_app.route("/health", methods=["GET"])
